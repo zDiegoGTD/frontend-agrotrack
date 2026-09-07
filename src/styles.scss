@@ -1,1 +1,50 @@
-/* You can add global styles to this file, and also import other style files */
+/* AgroTrack — estilos base. Sin libreria de UI: tokens + unos pocos componentes. */
+:root {
+  --verde-900: #1f4d2b;
+  --verde-700: #2e7d46;
+  --verde-100: #dcefe0;
+  --gris-50: #f7f8f7;
+  --gris-100: #e9ecea;
+  --gris-300: #c9cfcb;
+  --gris-600: #5f6b64;
+  --rojo-600: #c0392b;
+  --ambar-600: #b7791f;
+  --azul-600: #2b6cb0;
+  --sombra: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; }
+body { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; background: var(--gris-50); color: #1d241f; font-size: 14px; }
+h1 { font-size: 1.5rem; margin: 0 0 1rem; } h2 { font-size: 1.1rem; margin: 0 0 .75rem; } h3 { font-size: 1rem; margin: 0 0 .5rem; }
+a { color: var(--verde-700); }
+
+.card { background: #fff; border-radius: 10px; padding: 1rem 1.25rem; box-shadow: var(--sombra); margin-bottom: 1rem; }
+.vacio { color: var(--gris-600); font-style: italic; text-align: center; padding: 1rem; }
+
+label { font-size: .85rem; color: var(--gris-600); display: flex; flex-direction: column; gap: .25rem; }
+input, select, textarea { font: inherit; padding: .45rem .6rem; border: 1px solid var(--gris-300); border-radius: 6px; background: #fff; color: inherit; }
+input:focus, select:focus, textarea:focus { outline: 2px solid var(--verde-100); border-color: var(--verde-700); }
+
+.btn { font: inherit; padding: .45rem .9rem; border-radius: 6px; border: 1px solid transparent; cursor: pointer; background: var(--gris-100); color: #1d241f; }
+.btn:hover { filter: brightness(.96); } .btn:disabled { opacity: .55; cursor: not-allowed; }
+.btn--primario { background: var(--verde-700); color: #fff; }
+.btn--sec { background: #fff; border-color: var(--gris-300); }
+.btn--ghost { background: transparent; color: inherit; } .topbar .btn--ghost { color: #fff; }
+.btn--peligro { background: var(--rojo-600); color: #fff; }
+
+.alerta { padding: .6rem .9rem; border-radius: 6px; font-size: .9rem; }
+.alerta--error { background: #fdecea; color: var(--rojo-600); border: 1px solid #f5c6c2; }
+
+.tabla-wrap { overflow-x: auto; }
+.tabla { width: 100%; border-collapse: collapse; background: #fff; border-radius: 10px; box-shadow: var(--sombra); }
+.tabla th, .tabla td { padding: .55rem .75rem; text-align: left; border-bottom: 1px solid var(--gris-100); vertical-align: top; }
+.tabla th { font-size: .78rem; text-transform: uppercase; letter-spacing: .03em; color: var(--gris-600); background: var(--gris-50); }
+
+.badge { display: inline-block; padding: .15rem .55rem; border-radius: 999px; font-size: .75rem; font-weight: 600; white-space: nowrap; }
+.badge--registrada { background: #e8eef7; color: var(--azul-600); }
+.badge--recibida { background: var(--verde-100); color: var(--verde-900); }
+.badge--en_clasificacion { background: #fdf3dc; color: var(--ambar-600); }
+.badge--en_despacho { background: #ede7f6; color: #5e35b1; }
+.badge--despachada { background: var(--verde-700); color: #fff; }
+.badge--rechazada { background: #fdecea; color: var(--rojo-600); }
