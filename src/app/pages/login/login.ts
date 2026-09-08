@@ -1,4 +1,4 @@
-import { Component, computed, inject, signal } from '@angular/core';
+import { Component, computed, effect, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
@@ -65,6 +65,17 @@ export class Login {
   readonly error = signal('');
   readonly entrando = signal(false);
 
+  constructor() {
+    // Al volver de Microsoft, MSAL devuelve al usuario a la pagina desde la
+    // que empezo el login: esta misma. Para entonces ya hay sesion, pero sin
+    // esto la pantalla se queda igual y parece que el login no funciono.
+    effect(() => {
+      if (this.auth.user()) {
+        this.router.navigate(['/dashboard'], { replaceUrl: true });
+      }
+    });
+  }
+
   /** Error de MSAL: el que trae el servicio (de la vuelta de Azure) o el del último clic. */
   private readonly errorClic = signal<string | null>(null);
   readonly errorMsal = computed(
@@ -96,10 +107,10 @@ export class Login {
   }
 
   entrar() {
+    // No navega: al fijar el token cambia auth.user() y el effect de arriba
+    // lleva al panel. Un solo camino de entrada para los dos modos.
     const dev = this.auth as DevTokenAuthService;
-    if (dev.establecerToken(this.token)) {
-      this.router.navigate(['/dashboard']);
-    } else {
+    if (!dev.establecerToken(this.token)) {
       this.error.set('El token no es válido o está vencido.');
     }
   }
