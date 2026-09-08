@@ -1,8 +1,13 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
 import { environment } from '../../../environments/environment';
 import { AuthService, DevTokenAuthService } from '../../core/auth/auth.service';
+import {
+  MsalAuthService,
+  limpiarInteraccionPendiente,
+  mensajeDeError,
+} from '../../core/auth/msal-auth.service';
 
 /** /login: boton de Microsoft (MSAL) o, en desarrollo, pegar un token de mint.mjs. */
 @Component({
@@ -15,9 +20,16 @@ import { AuthService, DevTokenAuthService } from '../../core/auth/auth.service';
         <p class="sub">Acopio y despacho de producción agrícola</p>
 
         @if (modoMsal) {
-          <button class="btn btn--ms" (click)="auth.login()">
-            <span class="logo-ms"></span> Iniciar sesión con Microsoft
+          <button class="btn btn--ms" (click)="entrarConMicrosoft()" [disabled]="entrando()">
+            <span class="logo-ms"></span>
+            {{ entrando() ? 'Redirigiendo…' : 'Iniciar sesión con Microsoft' }}
           </button>
+          @if (errorMsal()) {
+            <p class="error">{{ errorMsal() }}</p>
+            <button class="btn btn--secundario" (click)="reintentarLimpio()">
+              Limpiar sesión y reintentar
+            </button>
+          }
         } @else {
           <p class="hint">
             Modo desarrollo. Emite un token con<br />
@@ -41,7 +53,8 @@ import { AuthService, DevTokenAuthService } from '../../core/auth/auth.service';
     .logo-ms { width: 16px; height: 16px; background:
       linear-gradient(90deg, #f25022 50%, #7fba00 50%) top / 100% 50% no-repeat,
       linear-gradient(90deg, #00a4ef 50%, #ffb900 50%) bottom / 100% 50% no-repeat; }
-    .error { color: var(--rojo-600); font-size: .85rem; }
+    .btn--secundario { width: 100%; margin-top: .5rem; background: var(--gris-100); }
+    .error { color: var(--rojo-600); font-size: .85rem; word-break: break-word; }
   `,
 })
 export class Login {
@@ -50,6 +63,37 @@ export class Login {
   readonly modoMsal = environment.auth.mode === 'msal';
   token = '';
   readonly error = signal('');
+  readonly entrando = signal(false);
+
+  /** Error de MSAL: el que trae el servicio (de la vuelta de Azure) o el del último clic. */
+  private readonly errorClic = signal<string | null>(null);
+  readonly errorMsal = computed(
+    () => this.errorClic() ?? (this.auth as Partial<MsalAuthService>).error?.() ?? null,
+  );
+
+  /**
+   * El login redirige fuera de la página, así que en el camino feliz este
+   * método nunca termina. Si termina, es que algo falló — y sin este catch
+   * el fallo sería una promesa rechazada que nadie ve: el usuario pulsa y
+   * no ocurre nada.
+   */
+  async entrarConMicrosoft() {
+    this.entrando.set(true);
+    this.errorClic.set(null);
+    try {
+      await this.auth.login();
+    } catch (e) {
+      this.errorClic.set(mensajeDeError(e));
+    } finally {
+      this.entrando.set(false);
+    }
+  }
+
+  /** Para cuando queda basura de un intento anterior en el navegador. */
+  async reintentarLimpio() {
+    limpiarInteraccionPendiente();
+    await this.entrarConMicrosoft();
+  }
 
   entrar() {
     const dev = this.auth as DevTokenAuthService;

@@ -1,6 +1,6 @@
 import { Injectable, inject, signal } from '@angular/core';
 import { MsalService } from '@azure/msal-angular';
-import { AccountInfo, InteractionRequiredAuthError } from '@azure/msal-browser';
+import { AccountInfo, BrowserAuthError, InteractionRequiredAuthError } from '@azure/msal-browser';
 import { environment } from '../../../environments/environment';
 import { AuthService, usuarioDesdeClaims } from './auth.service';
 import { Usuario } from '../models';
@@ -18,10 +18,24 @@ export class MsalAuthService extends AuthService {
   private readonly _user = signal<Usuario | null>(null);
   readonly user = this._user.asReadonly();
 
+  private readonly _error = signal<string | null>(null);
+  /** Ultimo fallo de autenticacion, para mostrarlo en pantalla. */
+  readonly error = this._error.asReadonly();
+
   async init(): Promise<void> {
     await this.msal.instance.initialize();
-    // Si venimos de vuelta del login de Microsoft, aqui llega la respuesta.
-    const respuesta = await this.msal.instance.handleRedirectPromise();
+    let respuesta = null;
+    try {
+      // Si venimos de vuelta del login de Microsoft, aqui llega la respuesta.
+      respuesta = await this.msal.instance.handleRedirectPromise();
+    } catch (e) {
+      // Un error al volver de Azure (consentimiento denegado, URI mal
+      // registrada) no puede impedir que la app arranque: si dejamos que
+      // suba, el APP_INITIALIZER falla y la pantalla queda en blanco, sin
+      // ninguna pista de lo ocurrido.
+      this._error.set(mensajeDeError(e));
+      console.error('[MSAL] fallo al procesar la vuelta del login', e);
+    }
     const cuenta = respuesta?.account ?? this.msal.instance.getAllAccounts()[0] ?? null;
     if (cuenta) {
       this.msal.instance.setActiveAccount(cuenta);
@@ -43,8 +57,29 @@ export class MsalAuthService extends AuthService {
     }
   }
 
+  /**
+   * Lanza el login por redireccion.
+   *
+   * <p>Si un intento anterior se interrumpio a medias (se cerro la pestana,
+   * Azure devolvio un error), MSAL deja marcado "interaction_in_progress" en
+   * el almacenamiento del navegador y **rechaza en silencio** todo intento
+   * posterior: el usuario pulsa el boton y no pasa absolutamente nada. Aqui
+   * se detecta ese caso, se limpia la marca y se reintenta una vez.
+   */
   async login(): Promise<void> {
-    await this.msal.instance.loginRedirect({ scopes: this.scopes });
+    this._error.set(null);
+    try {
+      await this.msal.instance.loginRedirect({ scopes: this.scopes });
+    } catch (e) {
+      if (esInteraccionEnCurso(e)) {
+        limpiarInteraccionPendiente();
+        await this.msal.instance.loginRedirect({ scopes: this.scopes });
+        return;
+      }
+      this._error.set(mensajeDeError(e));
+      console.error('[MSAL] loginRedirect fallo', e);
+      throw e;
+    }
   }
 
   async logout(): Promise<void> {
@@ -68,4 +103,36 @@ export class MsalAuthService extends AuthService {
       });
     }
   }
+}
+
+/** MSAL rechaza un login nuevo mientras cree que hay otro a medias. */
+export function esInteraccionEnCurso(e: unknown): boolean {
+  return e instanceof BrowserAuthError && e.errorCode === 'interaction_in_progress';
+}
+
+/**
+ * Borra la marca de interaccion pendiente que MSAL deja en el navegador.
+ * No hay API publica para esto; la clave sigue el patron
+ * `msal.<clientId>.interaction.status`, asi que se limpia por prefijo.
+ */
+export function limpiarInteraccionPendiente(): void {
+  for (const almacen of [localStorage, sessionStorage]) {
+    for (const clave of Object.keys(almacen)) {
+      if (clave.startsWith('msal.') && clave.includes('interaction.status')) {
+        almacen.removeItem(clave);
+      }
+    }
+  }
+}
+
+/** Mensaje legible para el usuario, sin perder el codigo AADSTS/MSAL. */
+export function mensajeDeError(e: unknown): string {
+  if (e instanceof BrowserAuthError) {
+    return `${e.errorCode}: ${e.errorMessage}`;
+  }
+  if (e && typeof e === 'object' && 'errorCode' in e) {
+    const err = e as { errorCode?: string; errorMessage?: string };
+    return `${err.errorCode ?? 'error'}: ${err.errorMessage ?? ''}`.trim();
+  }
+  return e instanceof Error ? e.message : String(e);
 }
