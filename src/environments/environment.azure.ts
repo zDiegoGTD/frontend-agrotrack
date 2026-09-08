@@ -1,15 +1,14 @@
-// Lo genera infra/local/azure-local.ps1 con tu TENANT_ID y CLIENT_ID.
-// Esta version es solo para que el proyecto compile sin haberlo corrido.
+﻿// Generado por infra/local/azure-local.ps1 â€” login real de Azure contra el backend local.
 export const environment = {
   production: false,
   apiUrl: 'http://localhost:8081',
   auth: {
     mode: 'msal' as 'dev' | 'msal',
     msal: {
-      clientId: 'REEMPLAZAR_CLIENT_ID',
-      tenantId: 'REEMPLAZAR_TENANT_ID',
+      clientId: '44f417b1-ff99-4463-974a-56bb29cb66dd',
+      tenantId: '74c11418-e5f3-4253-9755-b665d755321c',
       redirectUri: 'http://localhost:4200',
-      apiScope: 'api://REEMPLAZAR_CLIENT_ID/access_as_user',
+      apiScope: 'api://44f417b1-ff99-4463-974a-56bb29cb66dd/access_as_user',
     },
   },
 };
