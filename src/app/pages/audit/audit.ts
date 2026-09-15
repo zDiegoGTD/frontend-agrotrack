@@ -2,40 +2,53 @@ import { DatePipe, JsonPipe } from '@angular/common';
 import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
+import { ESTADO_DE_EVENTO } from '../../core/estados';
 import { EventoAuditoria, Problema } from '../../core/models';
+import { EstadoBadge } from '../../shared/estado-badge';
 
 /** /audit, seccion 6: trazabilidad de la entrega. Filtros: usuario, fechas, tipo de evento. */
 @Component({
   selector: 'app-audit',
-  imports: [FormsModule, DatePipe, JsonPipe],
+  imports: [FormsModule, DatePipe, JsonPipe, EstadoBadge],
   template: `
-    <h1>Auditoría</h1>
-    <section class="card filtros">
-      <label>Código de entrega <input [(ngModel)]="codigo" placeholder="DEL-2026-000001" (keyup.enter)="verTimeline()" /></label>
-      <button class="btn btn--primario" (click)="verTimeline()" [disabled]="!codigo.trim()">Ver timeline</button>
-      <span class="sep"></span>
-      <label>Usuario <input [(ngModel)]="f.usuario" placeholder="oid" /></label>
-      <label>Tipo
-        <select [(ngModel)]="f.tipo"><option value="">Todos</option>
-          @for (t of tipos; track t) { <option [value]="t">{{ t }}</option> }</select></label>
-      <label>Desde <input type="date" [(ngModel)]="f.desde" /></label>
-      <label>Hasta <input type="date" [(ngModel)]="f.hasta" /></label>
-      <button class="btn btn--sec" (click)="buscar()">Buscar eventos</button>
+    <div class="pagina-cab">
+      <div><h1>Auditoría</h1><p>Trazabilidad inmutable: cada cambio de estado que pasó por Kafka</p></div>
+    </div>
+
+    <section class="panel">
+      <div class="panel__cab"><div class="panel__titulo"><img src="img/nav-auditoria.png" alt="" /><div><h2>Buscar</h2><p>Por lote, o filtrando todos los eventos</p></div></div></div>
+      <div class="panel__cuerpo filtros">
+        <label>Código de lote <input class="mono" [(ngModel)]="codigo" placeholder="DEL-2026-000001" (keyup.enter)="verTimeline()" /></label>
+        <button class="btn btn--primario" (click)="verTimeline()" [disabled]="!codigo.trim()">Ver línea de tiempo</button>
+      </div>
+      <div class="panel__cuerpo filtros">
+        <label>Usuario (oid) <input class="mono" [(ngModel)]="f.usuario" placeholder="oid" /></label>
+        <label>Tipo
+          <select [(ngModel)]="f.tipo"><option value="">Todos</option>
+            @for (t of tipos; track t) { <option [value]="t">{{ t }}</option> }</select></label>
+        <label>Desde <input type="date" [(ngModel)]="f.desde" /></label>
+        <label>Hasta <input type="date" [(ngModel)]="f.hasta" /></label>
+        <button class="btn btn--sol" (click)="buscar()">Buscar eventos</button>
+      </div>
     </section>
-    @if (error()) { <p class="alerta alerta--error">{{ error() }}</p> }
+    @if (error()) { <p class="alerta alerta--error">⚠️ {{ error() }}</p> }
 
     @if (timeline().length) {
-      <section class="card">
-        <h2>Timeline de {{ codigoMostrado }}</h2>
+      <section class="panel">
+        <div class="panel__cab"><div class="panel__titulo"><img src="img/ico-checklist.png" alt="" /><div><h2>Línea de tiempo de <span class="mono">{{ codigoMostrado }}</span></h2><p>{{ timeline().length }} eventos, del más antiguo al más nuevo</p></div></div></div>
         <ol class="timeline">
           @for (ev of timeline(); track ev.eventId) {
-            <li>
-              <div class="punto"></div>
+            <li [class]="'paso paso--' + (estadoDe(ev) ?? 'otro').toLowerCase()">
+              <span class="punto"></span>
               <div class="cuerpo">
-                <div class="linea1"><b>{{ ev.tipo }}</b> <span class="cuando">{{ ev.ocurridoEn | date: 'dd/MM/yyyy HH:mm:ss' }}</span></div>
-                <div class="quien">{{ ev.actorNombre || ev.actorId }} <small>({{ ev.actorRol }})</small> · desde {{ ev.source }}</div>
-                <details><summary>datos</summary><pre>{{ ev.data | json }}</pre>
-                  <small>eventId {{ ev.eventId }} · trace {{ ev.traceId }}</small></details>
+                <div class="linea1">
+                  @if (estadoDe(ev); as est) { <app-estado-badge [estado]="est" /> }
+                  <b class="mono tipo">{{ ev.tipo }}</b>
+                  <span class="mono cuando">{{ ev.ocurridoEn | date: 'dd/MM/yyyy HH:mm:ss' }}</span>
+                </div>
+                <div class="quien">{{ ev.actorNombre || ev.actorId }} <span class="pildora">{{ ev.actorRol }}</span> · desde {{ ev.source }}</div>
+                <details><summary>Ver datos del evento</summary><pre>{{ ev.data | json }}</pre>
+                  <small class="mono">eventId {{ ev.eventId }} · trace {{ ev.traceId }}</small></details>
               </div>
             </li>
           }
@@ -44,16 +57,17 @@ import { EventoAuditoria, Problema } from '../../core/models';
     }
 
     @if (buscados()) {
-      <section class="card">
-        <h2>Eventos <small>{{ eventos().length }}</small></h2>
+      <section class="panel">
+        <div class="panel__cab"><div class="panel__titulo"><img src="img/nav-reporteria.png" alt="" /><div><h2>Eventos</h2><p>{{ eventos().length }} resultados (máx. 200)</p></div></div></div>
         <div class="tabla-wrap"><table class="tabla">
-          <thead><tr><th>Cuándo</th><th>Entrega</th><th>Evento</th><th>Quién</th><th>Rol</th><th></th></tr></thead>
+          <thead><tr><th>Cuándo</th><th>Lote</th><th>Evento</th><th>Quién</th><th>Rol</th><th>Id</th></tr></thead>
           <tbody>
             @for (ev of eventos(); track ev.eventId) {
-              <tr><td>{{ ev.ocurridoEn | date: 'dd/MM HH:mm:ss' }}</td>
-                <td><a href="#" (click)="$event.preventDefault(); codigo = ev.entregaCodigo; verTimeline()">{{ ev.entregaCodigo }}</a></td>
-                <td>{{ ev.tipo }}</td><td>{{ ev.actorNombre || ev.actorId }}</td><td>{{ ev.actorRol }}</td>
-                <td><small>{{ ev.eventId.slice(0, 8) }}…</small></td></tr>
+              <tr><td class="mono fecha">{{ ev.ocurridoEn | date: 'dd/MM HH:mm:ss' }}</td>
+                <td><a href="#" class="mono" (click)="$event.preventDefault(); codigo = ev.entregaCodigo; verTimeline()">{{ ev.entregaCodigo }}</a></td>
+                <td>@if (estadoDe(ev); as est) { <app-estado-badge [estado]="est" /> } @else { <span class="mono">{{ ev.tipo }}</span> }</td>
+                <td>{{ ev.actorNombre || ev.actorId }}</td><td><span class="pildora">{{ ev.actorRol }}</span></td>
+                <td><small class="mono">{{ ev.eventId.slice(0, 8) }}…</small></td></tr>
             } @empty { <tr><td colspan="6" class="vacio">Sin eventos para ese filtro.</td></tr> }
           </tbody>
         </table></div>
@@ -61,18 +75,24 @@ import { EventoAuditoria, Problema } from '../../core/models';
     }
   `,
   styles: `
-    .filtros { display: flex; gap: .75rem; align-items: end; flex-wrap: wrap; margin-bottom: 1rem; } .sep { flex-basis: 100%; height: 0; }
-    .timeline { list-style: none; padding: 0; margin: 0; }
-    .timeline li { display: grid; grid-template-columns: 20px 1fr; gap: .75rem; position: relative; padding-bottom: 1rem; }
-    .timeline li::before { content: ''; position: absolute; left: 9px; top: 14px; bottom: 0; width: 2px; background: var(--gris-100); }
-    .punto { width: 12px; height: 12px; border-radius: 50%; background: var(--verde-700); margin: 4px; }
-    .cuando { color: var(--gris-600); font-size: .85rem; margin-left: .5rem; } .quien { font-size: .88rem; color: var(--gris-600); }
-    pre { background: var(--gris-50); padding: .5rem; font-size: .75rem; overflow-x: auto; }
+    .filtros { display: flex; gap: .75rem; align-items: end; flex-wrap: wrap; }
+    .timeline { list-style: none; margin: 0; padding: 1.2rem 1.35rem; }
+    .paso { display: grid; grid-template-columns: 22px 1fr; gap: .9rem; position: relative; padding-bottom: 1.1rem; }
+    .paso::before { content: ''; position: absolute; left: 10px; top: 20px; bottom: 0; border-left: 3px dashed var(--tierra-30); }
+    .paso:last-child::before { display: none; }
+    .punto { width: 22px; height: 22px; border-radius: 50%; border: var(--trazo-fino); box-shadow: var(--sombra-sm); background: #fff; margin-top: 2px; }
+    .paso--recibida .punto { background: var(--sol); } .paso--en_clasificacion .punto { background: var(--cielo); }
+    .paso--en_despacho .punto { background: var(--pasto-claro); } .paso--despachada .punto { background: var(--pasto-oscuro); } .paso--rechazada .punto { background: var(--granero); }
+    .linea1 { display: flex; align-items: center; gap: .6rem; flex-wrap: wrap; }
+    .tipo { font-size: .8rem; } .cuando, .fecha { font-size: .74rem; color: var(--tierra-70); }
+    .quien { font-size: .86rem; font-weight: 600; margin-top: .3rem; }
+    details { margin-top: .35rem; } summary { cursor: pointer; font-family: var(--fuente-titulo); font-weight: 700; font-size: .8rem; }
+    pre { background: var(--crema); border: 2px solid var(--tierra-15); border-radius: 10px; padding: .6rem; font-size: .74rem; overflow-x: auto; }
   `,
 })
 export class Audit implements OnInit {
   private readonly api = inject(ApiService);
-  readonly tipos = ['delivery.registered', 'delivery.received', 'delivery.classifying', 'delivery.dispatching', 'delivery.dispatched', 'delivery.rejected'];
+  readonly tipos = Object.keys(ESTADO_DE_EVENTO);
 
   codigo = '';
   codigoMostrado = '';
@@ -81,6 +101,8 @@ export class Audit implements OnInit {
   readonly eventos = signal<EventoAuditoria[]>([]);
   readonly buscados = signal(false);
   readonly error = signal('');
+
+  estadoDe = (ev: EventoAuditoria) => ESTADO_DE_EVENTO[ev.tipo] ?? null;
 
   async ngOnInit() {
     await this.buscar();

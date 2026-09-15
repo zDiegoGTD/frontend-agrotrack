@@ -15,46 +15,62 @@ import {
   imports: [FormsModule],
   template: `
     <div class="login">
-      <div class="card">
-        <h1>🌾 AgroTrack</h1>
-        <p class="sub">Acopio y despacho de producción agrícola</p>
+      <div class="tarjeta">
+        <div class="cab">
+          <img class="logo" src="img/logo-circulo.png" alt="" />
+          <div>
+            <h1>AgroTrack</h1>
+            <p>Acopio y despacho de producción agrícola</p>
+          </div>
+        </div>
 
-        @if (modoMsal) {
-          <button class="btn btn--ms" (click)="entrarConMicrosoft()" [disabled]="entrando()">
-            <span class="logo-ms"></span>
-            {{ entrando() ? 'Redirigiendo…' : 'Iniciar sesión con Microsoft' }}
-          </button>
-          @if (errorMsal()) {
-            <p class="error">{{ errorMsal() }}</p>
-            <button class="btn btn--secundario" (click)="reintentarLimpio()">
-              Limpiar sesión y reintentar
+        <div class="cuerpo">
+          @if (modoMsal) {
+            <p class="bienvenida">¡Hola! Entra con tu cuenta de la organización para ver lo que pasa hoy en la planta.</p>
+            <button class="btn btn-ms" (click)="entrarConMicrosoft()" [disabled]="entrando()">
+              <span class="logo-ms"></span>
+              {{ entrando() ? 'Redirigiendo…' : 'Iniciar sesión con Microsoft' }}
             </button>
+            @if (errorMsal()) {
+              <p class="alerta alerta--error">{{ errorMsal() }}</p>
+              <button class="btn btn--sec ancho" (click)="reintentarLimpio()">Limpiar sesión y reintentar</button>
+            }
+          } @else {
+            <p class="bienvenida">
+              <b>Modo desarrollo.</b> Emite un token con
+              <code>node infra/local/jwt/mint.mjs OPERADOR</code>
+              (o ADMIN, CLIENTE, AUDITOR) y pégalo aquí.
+            </p>
+            <textarea [(ngModel)]="token" rows="5" placeholder="eyJhbGciOi..."></textarea>
+            @if (error()) { <p class="alerta alerta--error">{{ error() }}</p> }
+            <button class="btn btn--primario ancho" (click)="entrar()" [disabled]="!token.trim()">Entrar</button>
           }
-        } @else {
-          <p class="hint">
-            Modo desarrollo. Emite un token con<br />
-            <code>node infra/local/jwt/mint.mjs OPERADOR</code><br />
-            (o ADMIN, CLIENTE, AUDITOR) y pégalo aquí.
-          </p>
-          <textarea [(ngModel)]="token" rows="5" placeholder="eyJhbGciOi..."></textarea>
-          @if (error()) { <p class="error">{{ error() }}</p> }
-          <button class="btn btn--primario" (click)="entrar()" [disabled]="!token.trim()">Entrar</button>
-        }
+        </div>
       </div>
+      <img class="mascota" src="img/mascota-saluda.png" alt="" />
     </div>
   `,
   styles: `
-    .login { min-height: 100vh; display: grid; place-items: center; background: linear-gradient(160deg, var(--verde-900), var(--verde-700)); }
-    .card { background: #fff; padding: 2rem; border-radius: 12px; width: min(440px, 92vw); box-shadow: 0 20px 60px rgba(0,0,0,.25); }
-    h1 { margin: 0 0 .25rem; } .sub { color: var(--gris-600); margin: 0 0 1.5rem; }
-    .hint { font-size: .85rem; color: var(--gris-600); } code { background: var(--gris-100); padding: .1rem .3rem; border-radius: 4px; }
-    textarea { width: 100%; font-family: monospace; font-size: .75rem; margin: .5rem 0; }
-    .btn--ms { width: 100%; background: #2f2f2f; color: #fff; display: flex; gap: .6rem; justify-content: center; }
-    .logo-ms { width: 16px; height: 16px; background:
+    .login { min-height: 100vh; display: grid; place-items: center; padding: 1.5rem; position: relative; overflow: hidden;
+      background: radial-gradient(circle at 20% 15%, #fff 0, transparent 40%), var(--crema-fondo); }
+    .tarjeta { width: min(460px, 100%); background: #fff; border: var(--trazo); border-radius: 22px; box-shadow: var(--sombra-lg); overflow: hidden; position: relative; z-index: 1; }
+    .cab { background: var(--pasto-claro); border-bottom: var(--trazo); padding: 1.1rem 1.4rem; display: flex; gap: 1rem; align-items: center; }
+    .logo { width: 72px; height: 72px; }
+    h1 { margin: 0; font-size: 2rem; }
+    .cab p { margin: 0; font-weight: 700; color: var(--tierra-70); }
+    .cuerpo { padding: 1.3rem 1.4rem 1.5rem; display: grid; gap: .8rem; }
+    .bienvenida { margin: 0; font-weight: 600; line-height: 1.5; }
+    code { font-family: var(--fuente-mono); font-size: .78rem; background: var(--crema); border: 1px solid var(--tierra-30); padding: .05rem .3rem; border-radius: 6px; }
+    textarea { width: 100%; font-family: var(--fuente-mono); font-size: .72rem; }
+    .ancho { width: 100%; }
+    .btn-ms { width: 100%; padding: .75rem 1rem; font-size: 1rem; background: var(--tierra); color: #fff; }
+    .btn-ms:hover { background: #3f2a1f; }
+    .logo-ms { width: 18px; height: 18px; background:
       linear-gradient(90deg, #f25022 50%, #7fba00 50%) top / 100% 50% no-repeat,
       linear-gradient(90deg, #00a4ef 50%, #ffb900 50%) bottom / 100% 50% no-repeat; }
-    .btn--secundario { width: 100%; margin-top: .5rem; background: var(--gris-100); }
-    .error { color: var(--rojo-600); font-size: .85rem; word-break: break-word; }
+    .alerta { word-break: break-word; }
+    .mascota { position: absolute; right: max(2vw, calc(50% - 560px)); bottom: 2vh; width: min(300px, 30vw); transform: rotate(-4deg); pointer-events: none; }
+    @media (max-width: 900px) { .mascota { display: none; } }
   `,
 })
 export class Login {

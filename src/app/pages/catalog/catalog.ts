@@ -1,9 +1,12 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
+import { nivelCapacidad } from '../../core/estados';
 import { Bodega, Problema, Producto } from '../../core/models';
+import { BarraCapacidad } from '../../shared/barra-capacidad';
+import { Modal } from '../../shared/modal';
 
 type ProductoForm = { id: number | null; codigo: string; nombre: string; unidadMedida: string; tarifa: number | null; activo: boolean };
 type BodegaForm = { id: number | null; nombre: string; ubicacion: string; capacidadTotal: number | null };
@@ -11,79 +14,113 @@ type BodegaForm = { id: number | null; nombre: string; ubicacion: string; capaci
 /** /catalog, seccion 6: productos, bodegas y capacidad. Admin y Jefe de acopio ven; solo Admin edita. */
 @Component({
   selector: 'app-catalog',
-  imports: [FormsModule, DecimalPipe],
+  imports: [FormsModule, DecimalPipe, BarraCapacidad, Modal],
   template: `
-    <h1>Catálogo</h1>
-    @if (error()) { <p class="alerta alerta--error">{{ error() }}</p> }
+    <div class="pagina-cab">
+      <div><h1>Catálogo</h1><p>Bodegas, capacidad de almacenaje y productos que se reciben</p></div>
+      @if (esAdmin) {
+        <div class="acciones">
+          <button class="btn btn--sec" (click)="nuevaBodega()"><img src="img/ico-bodega.png" alt="" class="ico" /> Nueva bodega</button>
+          <button class="btn btn--primario" (click)="nuevoProducto()"><img src="img/ico-trigo.png" alt="" class="ico" /> Nuevo producto</button>
+        </div>
+      }
+    </div>
+    @if (error()) { <p class="alerta alerta--error">⚠️ {{ error() }}</p> }
 
-    <div class="dos">
-      <section class="card">
-        <div class="cabecera"><h2>Bodegas</h2>
-          @if (esAdmin) { <button class="btn btn--sec" (click)="nuevaBodega()">+ Bodega</button> }</div>
+    <section class="panel">
+      <div class="panel__cab">
+        <div class="panel__titulo"><img src="img/nav-catalogo.png" alt="" />
+          <div><h2>Bodegas y capacidad</h2><p>La capacidad baja al recibir un lote y vuelve si se rechaza</p></div></div>
+        <div class="resumen">
+          <div><small>Ocupación</small><b>{{ global().usado }}%</b></div>
+          <div><small>Libre</small><b class="mono">{{ libre() | number: '1.0-0' }}</b></div>
+          <div><small>Nominal</small><b class="mono">{{ total() | number: '1.0-0' }}</b></div>
+        </div>
+      </div>
+      <div class="panel__cuerpo"><app-barra-capacidad [total]="total()" [disponible]="libre()" /></div>
+      <div class="panel__cuerpo bodegas">
         @for (b of bodegas(); track b.id) {
-          <div class="bodega">
-            <div class="bodega__cab"><b>{{ b.nombre }}</b> <small>{{ b.ubicacion }}</small>
-              @if (esAdmin) { <button class="btn btn--ghost" (click)="editarBodega(b)">Editar</button> }</div>
-            <div class="barra"><div class="barra__uso" [style.width.%]="ocupacion(b)"></div></div>
-            <small>{{ b.capacidadDisponible | number }} disponible de {{ b.capacidadTotal | number }} ({{ ocupacion(b) | number: '1.0-0' }}% ocupado)</small>
+          <div class="bodega" [class.bodega--critica]="critica(b)">
+            <div class="bodega__cab">
+              <div><b>{{ b.nombre }}</b><br /><small>{{ b.ubicacion || 'Sin ubicación' }}</small></div>
+              @if (esAdmin) { <button class="btn btn--chico" (click)="editarBodega(b)">Editar</button> }
+            </div>
+            <app-barra-capacidad [total]="b.capacidadTotal" [disponible]="b.capacidadDisponible" [compacta]="true" />
+            @if (critica(b)) { <p class="aviso">⚠️ Alerta de sobrecupo para nuevas recepciones</p> }
           </div>
-        } @empty { <p class="vacio">Sin bodegas.</p> }
+        } @empty { <p class="vacio">Sin bodegas todavía.</p> }
+      </div>
+    </section>
 
-        @if (formBodega()) {
-          <form class="form" (ngSubmit)="guardarBodega()">
-            <h3>{{ formBodega()!.id ? 'Editar' : 'Nueva' }} bodega</h3>
-            <label>Nombre <input [(ngModel)]="formBodega()!.nombre" name="bn" required maxlength="120" /></label>
-            <label>Ubicación <input [(ngModel)]="formBodega()!.ubicacion" name="bu" maxlength="200" /></label>
-            <label>Capacidad total <input type="number" min="0.01" step="0.01" [(ngModel)]="formBodega()!.capacidadTotal" name="bc" required /></label>
-            @if (errorBodega()) { <p class="alerta alerta--error">{{ errorBodega() }}</p> }
-            <div><button class="btn btn--primario" type="submit">Guardar</button>
-              <button class="btn btn--ghost" type="button" (click)="formBodega.set(null)">Cancelar</button></div>
-          </form>
-        }
-      </section>
-
-      <section class="card">
-        <div class="cabecera"><h2>Productos</h2>
-          @if (esAdmin) { <button class="btn btn--sec" (click)="nuevoProducto()">+ Producto</button> }</div>
+    <section class="panel">
+      <div class="panel__cab">
+        <div class="panel__titulo"><img src="img/ico-trigo.png" alt="" />
+          <div><h2>Productos</h2><p>{{ productos().length }} en catálogo · {{ activos() }} activos</p></div></div>
+      </div>
+      <div class="tabla-wrap">
         <table class="tabla">
-          <thead><tr><th>Código</th><th>Nombre</th><th>Unidad</th><th class="num">Tarifa</th><th></th></tr></thead>
+          <thead><tr><th>Código</th><th>Nombre</th><th>Unidad</th><th class="num">Tarifa</th><th>Estado</th><th></th></tr></thead>
           <tbody>
             @for (p of productos(); track p.id) {
               <tr [class.inactivo]="!p.activo">
-                <td>{{ p.codigo }}</td><td>{{ p.nombre }} @if (!p.activo) { <small>(inactivo)</small> }</td>
-                <td>{{ p.unidadMedida }}</td><td class="num">{{ p.tarifa | number: '1.2-2' }}</td>
-                <td>@if (esAdmin) { <button class="btn btn--ghost" (click)="editarProducto(p)">Editar</button> }</td>
+                <td class="mono"><b>{{ p.codigo }}</b></td><td>{{ p.nombre }}</td>
+                <td><span class="chip">{{ p.unidadMedida }}</span></td>
+                <td class="num carga">$ {{ p.tarifa | number: '1.2-2' }}</td>
+                <td><span class="pildora" [class.pildora--sol]="!p.activo">{{ p.activo ? 'Activo' : 'Inactivo' }}</span></td>
+                <td class="num">@if (esAdmin) { <button class="btn btn--chico" (click)="editarProducto(p)">Editar</button> }</td>
               </tr>
-            } @empty { <tr><td colspan="5" class="vacio">Sin productos.</td></tr> }
+            } @empty { <tr><td colspan="6" class="vacio">Sin productos.</td></tr> }
           </tbody>
         </table>
+      </div>
+    </section>
 
-        @if (formProducto()) {
-          <form class="form" (ngSubmit)="guardarProducto()">
-            <h3>{{ formProducto()!.id ? 'Editar' : 'Nuevo' }} producto</h3>
-            <label>Código <input [(ngModel)]="formProducto()!.codigo" name="pc" required maxlength="30" /></label>
-            <label>Nombre <input [(ngModel)]="formProducto()!.nombre" name="pn" required maxlength="120" /></label>
-            <label>Unidad <input [(ngModel)]="formProducto()!.unidadMedida" name="pu" required maxlength="10" placeholder="KG" /></label>
-            <label>Tarifa <input type="number" min="0" step="0.01" [(ngModel)]="formProducto()!.tarifa" name="pt" required /></label>
-            <label class="check"><input type="checkbox" [(ngModel)]="formProducto()!.activo" name="pa" /> Activo</label>
-            @if (errorProducto()) { <p class="alerta alerta--error">{{ errorProducto() }}</p> }
-            <div><button class="btn btn--primario" type="submit">Guardar</button>
-              <button class="btn btn--ghost" type="button" (click)="formProducto.set(null)">Cancelar</button></div>
-          </form>
-        }
-      </section>
-    </div>
+    @if (formBodega(); as f) {
+      <app-modal [titulo]="f.id ? 'Editar bodega' : 'Nueva bodega'" subtitulo="La capacidad disponible se ajusta sola al cambiar el total" (cerrar)="formBodega.set(null)">
+        <label>Nombre <input [(ngModel)]="f.nombre" name="bn" maxlength="120" /></label>
+        <label>Ubicación <input [(ngModel)]="f.ubicacion" name="bu" maxlength="200" placeholder="Ej: Curicó" /></label>
+        <label>Capacidad total (kg) <input type="number" min="0.01" step="0.01" [(ngModel)]="f.capacidadTotal" name="bc" /></label>
+        @if (errorBodega()) { <p class="alerta alerta--error">{{ errorBodega() }}</p> }
+        <ng-container pie>
+          <button class="btn btn--ghost" (click)="formBodega.set(null)">Cancelar</button>
+          <button class="btn btn--primario" (click)="guardarBodega()">Guardar</button>
+        </ng-container>
+      </app-modal>
+    }
+
+    @if (formProducto(); as f) {
+      <app-modal [titulo]="f.id ? 'Editar producto' : 'Nuevo producto'" (cerrar)="formProducto.set(null)">
+        <div class="dos">
+          <label>Código <input [(ngModel)]="f.codigo" name="pc" maxlength="30" placeholder="TRIGO-01" /></label>
+          <label>Unidad <input [(ngModel)]="f.unidadMedida" name="pu" maxlength="10" placeholder="KG" /></label>
+        </div>
+        <label>Nombre <input [(ngModel)]="f.nombre" name="pn" maxlength="120" /></label>
+        <label>Tarifa <input type="number" min="0" step="0.01" [(ngModel)]="f.tarifa" name="pt" /></label>
+        <label class="check"><input type="checkbox" [(ngModel)]="f.activo" name="pa" /> Activo (visible al registrar entregas)</label>
+        @if (errorProducto()) { <p class="alerta alerta--error">{{ errorProducto() }}</p> }
+        <ng-container pie>
+          <button class="btn btn--ghost" (click)="formProducto.set(null)">Cancelar</button>
+          <button class="btn btn--primario" (click)="guardarProducto()">Guardar</button>
+        </ng-container>
+      </app-modal>
+    }
   `,
   styles: `
-    .dos { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; } @media (max-width: 900px) { .dos { grid-template-columns: 1fr; } }
-    .cabecera { display: flex; justify-content: space-between; align-items: center; }
-    .bodega { padding: .6rem 0; border-bottom: 1px solid var(--gris-100); }
-    .bodega__cab { display: flex; gap: .5rem; align-items: baseline; } .bodega__cab button { margin-left: auto; }
-    .barra { height: 8px; background: var(--gris-100); border-radius: 999px; margin: .35rem 0; overflow: hidden; }
-    .barra__uso { height: 100%; background: var(--verde-700); }
-    .form { display: grid; gap: .5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px dashed var(--gris-300); }
-    .check { display: flex; gap: .4rem; align-items: center; }
-    .num { text-align: right; } tr.inactivo td { color: var(--gris-600); }
+    .acciones { display: flex; gap: .6rem; flex-wrap: wrap; }
+    .ico { width: 22px; height: 22px; object-fit: contain; border-radius: 6px; }
+    .resumen { display: flex; gap: 1rem; background: rgba(255,255,255,.85); border: var(--trazo-fino); border-radius: 12px; box-shadow: var(--sombra-sm); padding: .35rem .9rem; }
+    .resumen div { display: flex; flex-direction: column; }
+    .resumen small { font-family: var(--fuente-titulo); font-size: .66rem; font-weight: 800; text-transform: uppercase; }
+    .resumen b { font-family: var(--fuente-titulo); color: var(--pasto-oscuro); }
+    .bodegas { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: .9rem; }
+    .bodega { padding: .85rem; border-radius: 14px; border: 2px solid var(--tierra-30); background: rgba(255,248,231,.5); }
+    .bodega--critica { border-color: var(--granero); background: rgba(232,84,62,.06); box-shadow: var(--sombra-sm); }
+    .bodega__cab { display: flex; justify-content: space-between; align-items: flex-start; gap: .5rem; margin-bottom: .5rem; font-family: var(--fuente-titulo); }
+    .aviso { margin: .45rem 0 0; color: var(--granero); font-family: var(--fuente-titulo); font-weight: 800; font-size: .8rem; }
+    .carga { font-family: var(--fuente-titulo); font-weight: 800; color: var(--pasto-oscuro); }
+    tr.inactivo td { color: var(--tierra-50); }
+    .dos { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
+    .check { flex-direction: row; align-items: center; gap: .5rem; }
   `,
 })
 export class Catalog implements OnInit {
@@ -98,11 +135,15 @@ export class Catalog implements OnInit {
   readonly errorProducto = signal('');
   readonly errorBodega = signal('');
 
+  readonly total = computed(() => this.bodegas().reduce((s, b) => s + b.capacidadTotal, 0));
+  readonly libre = computed(() => this.bodegas().reduce((s, b) => s + b.capacidadDisponible, 0));
+  readonly global = computed(() => nivelCapacidad(this.total(), this.libre()));
+  readonly activos = computed(() => this.productos().filter((p) => p.activo).length);
+  critica = (b: Bodega) => nivelCapacidad(b.capacidadTotal, b.capacidadDisponible).nivel === 'critico';
+
   async ngOnInit() {
     await this.cargar();
   }
-
-  ocupacion = (b: Bodega) => (b.capacidadTotal > 0 ? ((b.capacidadTotal - b.capacidadDisponible) / b.capacidadTotal) * 100 : 0);
 
   async cargar() {
     try {
@@ -114,10 +155,10 @@ export class Catalog implements OnInit {
     }
   }
 
-  nuevoProducto() { this.formProducto.set({ id: null, codigo: '', nombre: '', unidadMedida: 'KG', tarifa: null, activo: true }); }
-  editarProducto(p: Producto) { this.formProducto.set({ ...p }); }
-  nuevaBodega() { this.formBodega.set({ id: null, nombre: '', ubicacion: '', capacidadTotal: null }); }
-  editarBodega(b: Bodega) { this.formBodega.set({ id: b.id, nombre: b.nombre, ubicacion: b.ubicacion ?? '', capacidadTotal: b.capacidadTotal }); }
+  nuevoProducto() { this.errorProducto.set(''); this.formProducto.set({ id: null, codigo: '', nombre: '', unidadMedida: 'KG', tarifa: null, activo: true }); }
+  editarProducto(p: Producto) { this.errorProducto.set(''); this.formProducto.set({ ...p }); }
+  nuevaBodega() { this.errorBodega.set(''); this.formBodega.set({ id: null, nombre: '', ubicacion: '', capacidadTotal: null }); }
+  editarBodega(b: Bodega) { this.errorBodega.set(''); this.formBodega.set({ id: b.id, nombre: b.nombre, ubicacion: b.ubicacion ?? '', capacidadTotal: b.capacidadTotal }); }
 
   async guardarProducto() {
     const f = this.formProducto()!;
