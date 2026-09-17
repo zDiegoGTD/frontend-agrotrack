@@ -101,4 +101,6 @@ export interface Problema {
   detail: string;
   campos?: Record<string, string>;
   motivo?: string;
+  /** Codigo de negocio cuando el backend lo manda, p. ej. CUENTA_PENDIENTE. */
+  codigo?: string;
 }

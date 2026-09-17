@@ -116,19 +116,58 @@ export class ApiService {
     }
   }
 
+  /** Solo el codigo HTTP: para /sesion, que muestra 200 o 403 sin tratar el 403 como error. */
+  async probarAcceso(path: string): Promise<number> {
+    try {
+      return (await firstValueFrom(this.http.get(this.base + path, { observe: 'response', responseType: 'text' }))).status;
+    } catch (e) {
+      return e instanceof HttpErrorResponse ? e.status : 0;
+    }
+  }
+
   static aProblema(e: unknown): Problema {
     if (e instanceof HttpErrorResponse) {
       const cuerpo = e.error && typeof e.error === 'object' ? (e.error as Partial<Problema>) : {};
+      const texto = typeof e.error === 'string' ? e.error : '';
       return {
         status: e.status,
         title: cuerpo.title ?? e.statusText ?? 'Error',
-        detail:
-          cuerpo.detail ??
-          (e.status === 0 ? 'No se pudo conectar con el servidor' : e.status === 401 ? 'Sesión vencida' : e.status === 403 ? 'Tu rol no permite esta acción' : e.message),
+        detail: cuerpo.detail ?? mensajePorEstado(e.status, e.headers?.get('WWW-Authenticate') ?? '', texto),
         campos: cuerpo.campos,
         motivo: cuerpo.motivo,
+        codigo: cuerpo.codigo,
       };
     }
     return { status: 0, title: 'Error', detail: String(e) };
+  }
+}
+
+/**
+ * Mensaje para cuando el backend no manda problem+json. Distingue las causas
+ * de un 403: antes todo 403 decia "tu rol no permite", y un origen rechazado
+ * por CORS parecia un problema de permisos.
+ */
+export function mensajePorEstado(status: number, wwwAuthenticate: string, cuerpoTexto: string): string {
+  switch (status) {
+    case 0:
+      return 'No se pudo conectar con el servidor. Revisa tu conexión o si el sistema está encendido.';
+    case 401:
+      return 'Tu sesión venció o no es válida. Cierra sesión y vuelve a entrar.';
+    case 403:
+      if (wwwAuthenticate.includes('insufficient_scope')) return 'Tu rol no permite esta acción.';
+      if (/cors/i.test(cuerpoTexto)) return 'El servidor rechazó el origen de esta página (CORS). Es un problema de configuración, no de tu rol.';
+      return 'Acceso denegado para esta acción.';
+    case 404:
+      return 'No se encontró lo que buscas.';
+    case 409:
+      return 'La operación choca con el estado actual. Recarga e intenta de nuevo.';
+    case 429:
+      return 'Demasiadas solicitudes seguidas. Espera un minuto e intenta de nuevo.';
+    case 502:
+    case 503:
+    case 504:
+      return 'Un servicio no está disponible en este momento. Intenta en unos segundos.';
+    default:
+      return status >= 500 ? 'Error interno del servidor.' : `Error ${status}.`;
   }
 }

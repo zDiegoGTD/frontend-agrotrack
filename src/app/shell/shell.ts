@@ -123,6 +123,7 @@ export class Shell {
     { ruta: '/catalog', texto: 'Catálogo', icono: 'img/nav-catalogo.png', roles: ['ADMIN', 'OPERADOR'] },
     { ruta: '/reports', texto: 'Reportería', icono: 'img/nav-reporteria.png', roles: ['ADMIN'] },
     { ruta: '/audit', texto: 'Auditoría', icono: 'img/nav-auditoria.png', roles: ['ADMIN', 'AUDITOR'] },
+    { ruta: '/sesion', texto: 'Mi sesión', icono: 'img/ico-checklist.png', roles: ['ADMIN', 'OPERADOR', 'CLIENTE', 'AUDITOR'] },
   ];
 
   readonly enlaces = computed(() => this.todos.filter((e) => this.auth.hasRole(...e.roles)));

@@ -31,6 +31,7 @@ export const routes: Routes = [
         canActivate: [roleGuard('ADMIN', 'AUDITOR')],
         loadComponent: () => import('./pages/audit/audit').then((m) => m.Audit),
       },
+      { path: 'sesion', loadComponent: () => import('./pages/sesion/sesion').then((m) => m.Sesion) },
     ],
   },
   { path: '**', redirectTo: 'dashboard' },
