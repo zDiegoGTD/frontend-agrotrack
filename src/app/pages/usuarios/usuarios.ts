@@ -6,6 +6,7 @@ import { AuthService } from '../../core/auth/auth.service';
 import { ROL_ETIQUETA } from '../../core/estados';
 import { Bodega, CuentaUsuario, EstadoCuenta, Problema } from '../../core/models';
 import { AccionCuenta, ETIQUETA_CUENTA, FichaForm, accionesPara, fichaDesde, normalizarFicha } from '../../core/usuarios';
+import { Modal } from '../../shared/modal';
 
 type Filtro = EstadoCuenta | '';
 
@@ -15,61 +16,69 @@ type Filtro = EstadoCuenta | '';
  */
 @Component({
   selector: 'app-usuarios',
-  imports: [FormsModule, DatePipe],
+  imports: [FormsModule, DatePipe, Modal],
   template: `
-    <h1>Usuarios</h1>
-    <p class="nota">El rol lo asigna Azure AD; aquí se decide si la cuenta puede usar AgroTrack.</p>
-    @if (error()) { <p class="alerta alerta--error">{{ error() }}</p> }
-
-    <div class="filtros">
-      @for (f of filtros; track f.valor) {
-        <button class="btn" [class.btn--primario]="filtro() === f.valor" [class.btn--ghost]="filtro() !== f.valor"
-          (click)="filtrar(f.valor)">{{ f.texto }}</button>
-      }
+    <div class="pagina-cab">
+      <div><h1>Usuarios</h1><p>El rol lo asigna Azure AD; aquí se decide si la cuenta puede usar AgroTrack</p></div>
     </div>
+    @if (error()) { <p class="alerta alerta--error">⚠️ {{ error() }}</p> }
 
-    <section class="card tabla-wrap">
-      <table class="tabla">
-        <thead><tr><th>Nombre</th><th>Correo</th><th>Rol (último ingreso)</th><th>Estado</th><th>Solicitó</th><th></th></tr></thead>
-        <tbody>
-          @for (u of lista(); track u.id) {
-            <tr>
-              <td>{{ u.nombre ?? '—' }}</td>
-              <td>{{ u.email ?? '—' }}</td>
-              <td>{{ rol(u) }}</td>
-              <td><span class="estado estado--{{ u.estado.toLowerCase() }}">{{ etiqueta[u.estado] }}</span>
-                @if (u.motivo) { <small class="motivo">{{ u.motivo }}</small> }</td>
-              <td>{{ u.primerIngreso | date: 'short' }}</td>
-              <td class="acciones">
-                @for (a of acciones(u); track a.texto) {
-                  <button class="btn" [class.btn--peligro]="a.peligro" [class.btn--sec]="!a.peligro" (click)="iniciar(u, a)">{{ a.texto }}</button>
-                }
-                @if (u.rolUltimoToken === 'CLIENTE' || u.perfil) {
-                  <button class="btn btn--ghost" (click)="abrirFicha(u)">Ficha</button>
-                }
-              </td>
-            </tr>
-          } @empty { <tr><td colspan="6" class="vacio">No hay cuentas en este estado.</td></tr> }
-        </tbody>
-      </table>
+    <section class="panel">
+      <div class="panel__cab">
+        <div class="panel__titulo"><img src="img/nav-dashboard.png" alt="" />
+          <div><h2>Cuentas</h2><p>{{ lista().length }} {{ lista().length === 1 ? 'cuenta' : 'cuentas' }} en este filtro</p></div></div>
+        <div class="filtros">
+          @for (f of filtros; track f.valor) {
+            <button class="btn btn--chico" [class.btn--primario]="filtro() === f.valor" (click)="filtrar(f.valor)">{{ f.texto }}</button>
+          }
+        </div>
+      </div>
+      <div class="tabla-wrap">
+        <table class="tabla">
+          <thead><tr><th>Persona</th><th>Rol (último ingreso)</th><th>Estado</th><th>Solicitó</th><th></th></tr></thead>
+          <tbody>
+            @for (u of lista(); track u.id) {
+              <tr>
+                <td><b>{{ u.nombre ?? '—' }}</b><br /><small class="mono">{{ u.email ?? '—' }}</small></td>
+                <td><span class="pildora">{{ rol(u) }}</span></td>
+                <td><span class="estado estado--{{ u.estado.toLowerCase() }}">{{ etiqueta[u.estado] }}</span>
+                  @if (u.motivo) { <small class="motivo">{{ u.motivo }}</small> }</td>
+                <td class="mono fecha">{{ u.primerIngreso | date: 'dd MMM HH:mm' }}</td>
+                <td class="acciones">
+                  @for (a of acciones(u); track a.texto) {
+                    <button class="btn btn--chico" [class.btn--peligro]="a.peligro" [class.btn--primario]="!a.peligro" (click)="iniciar(u, a)">{{ a.texto }}</button>
+                  }
+                  @if (u.rolUltimoToken === 'CLIENTE' || u.perfil) {
+                    <button class="btn btn--chico" (click)="abrirFicha(u)">Ficha</button>
+                  }
+                </td>
+              </tr>
+            } @empty {
+              <tr><td colspan="5"><div class="vacio"><img src="img/mascota-saluda.png" alt="" class="vacio-img" /><br />No hay cuentas en este estado.</div></td></tr>
+            }
+          </tbody>
+        </table>
+      </div>
     </section>
 
     @if (enCurso(); as ac) {
-      <section class="card form">
-        <h3>{{ ac.accion.texto }} a {{ ac.usuario.nombre ?? ac.usuario.email }}</h3>
-        <label>Motivo <textarea [(ngModel)]="motivo" name="motivo" maxlength="500" rows="3"></textarea></label>
+      <app-modal [titulo]="ac.accion.texto + ' cuenta'" [subtitulo]="(ac.usuario.nombre ?? '') + ' · ' + (ac.usuario.email ?? '')" (cerrar)="enCurso.set(null)">
+        <label>Motivo (lo verá la persona) <textarea [(ngModel)]="motivo" name="motivo" maxlength="500" rows="3"></textarea></label>
         @if (errorAccion()) { <p class="alerta alerta--error">{{ errorAccion() }}</p> }
-        <div><button class="btn btn--peligro" (click)="confirmar()">{{ ac.accion.texto }}</button>
-          <button class="btn btn--ghost" (click)="enCurso.set(null)">Cancelar</button></div>
-      </section>
+        <ng-container pie>
+          <button class="btn btn--ghost" (click)="enCurso.set(null)">Cancelar</button>
+          <button class="btn btn--peligro" (click)="confirmar()">{{ ac.accion.texto }}</button>
+        </ng-container>
+      </app-modal>
     }
 
     @if (ficha(); as fi) {
-      <form class="card form" (ngSubmit)="guardarFicha()">
-        <h3>Ficha de {{ fi.usuario.nombre ?? fi.usuario.email }}</h3>
-        <label>RUT <input [(ngModel)]="fi.form.rut" name="rut" required placeholder="12345678-9" maxlength="15" /></label>
-        <label>Razón social <input [(ngModel)]="fi.form.razonSocial" name="rs" required maxlength="200" /></label>
-        <label>Teléfono <input [(ngModel)]="fi.form.telefono" name="tel" maxlength="30" /></label>
+      <app-modal titulo="Ficha del productor" [subtitulo]="(fi.usuario.nombre ?? '') + ' · ' + (fi.usuario.email ?? '')" (cerrar)="ficha.set(null)">
+        <div class="dos">
+          <label>RUT <input class="mono" [(ngModel)]="fi.form.rut" name="rut" placeholder="12345678-9" maxlength="15" /></label>
+          <label>Teléfono <input [(ngModel)]="fi.form.telefono" name="tel" maxlength="30" /></label>
+        </div>
+        <label>Razón social <input [(ngModel)]="fi.form.razonSocial" name="rs" maxlength="200" /></label>
         <label>Dirección <input [(ngModel)]="fi.form.direccion" name="dir" maxlength="300" /></label>
         <label>Bodega habitual
           <select [(ngModel)]="fi.form.bodegaHabitualId" name="bod">
@@ -78,22 +87,26 @@ type Filtro = EstadoCuenta | '';
           </select>
         </label>
         @if (errorFicha()) { <p class="alerta alerta--error">{{ errorFicha() }}</p> }
-        <div><button class="btn btn--primario" type="submit">Guardar</button>
-          <button class="btn btn--ghost" type="button" (click)="ficha.set(null)">Cancelar</button></div>
-      </form>
+        <ng-container pie>
+          <button class="btn btn--ghost" (click)="ficha.set(null)">Cancelar</button>
+          <button class="btn btn--primario" (click)="guardarFicha()">Guardar</button>
+        </ng-container>
+      </app-modal>
     }
   `,
   styles: `
-    .nota { color: var(--gris-600); margin-top: -.5rem; }
-    .filtros { display: flex; gap: .4rem; flex-wrap: wrap; margin: 1rem 0; }
+    .filtros { display: flex; gap: .4rem; flex-wrap: wrap; }
     .acciones { display: flex; gap: .35rem; flex-wrap: wrap; justify-content: flex-end; }
-    .estado { padding: .15rem .55rem; border-radius: 999px; font-size: .78rem; font-weight: 600; }
-    .estado--pendiente { background: #fff4d6; color: #7a5600; }
-    .estado--activo { background: var(--verde-100); color: var(--verde-900); }
-    .estado--rechazado { background: #fde2e1; color: #8a1c14; }
-    .estado--inactivo { background: var(--gris-100); color: var(--gris-600); }
-    .motivo { display: block; color: var(--gris-600); margin-top: .2rem; }
-    .form { display: grid; gap: .5rem; margin-top: 1rem; max-width: 520px; }
+    .estado { display: inline-block; padding: .1rem .6rem; border-radius: 999px; border: var(--trazo-fino); box-shadow: var(--sombra-sm);
+      font-family: var(--fuente-titulo); font-size: .76rem; font-weight: 800; white-space: nowrap; }
+    .estado--pendiente { background: var(--sol); }
+    .estado--activo { background: var(--pasto-oscuro); color: #fff; }
+    .estado--rechazado { background: var(--granero); color: #fff; }
+    .estado--inactivo { background: #fff; color: var(--tierra-70); }
+    .motivo { display: block; margin-top: .3rem; font-weight: 600; }
+    .fecha { font-size: .74rem; color: var(--tierra-70); white-space: nowrap; }
+    .vacio-img { width: 110px; }
+    .dos { display: grid; grid-template-columns: 1fr 1fr; gap: .8rem; }
   `,
 })
 export class Usuarios implements OnInit {

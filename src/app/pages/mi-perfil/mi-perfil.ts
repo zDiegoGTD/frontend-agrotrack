@@ -9,10 +9,15 @@ import { FichaForm, fichaDesde, normalizarFicha } from '../../core/usuarios';
   selector: 'app-mi-perfil',
   imports: [FormsModule],
   template: `
-    <h1>Mi ficha de productor</h1>
-    @if (cuenta(); as c) { <p class="nota">{{ c.nombre }} · {{ c.email }}</p> }
+    <div class="pagina-cab">
+      <div><h1>Mi ficha de productor</h1>
+        @if (cuenta(); as c) { <p>{{ c.nombre }} · {{ c.email }}</p> } @else { <p>Tus datos como productor agrícola</p> }</div>
+    </div>
 
-    <form class="card form" (ngSubmit)="guardar()">
+    <section class="panel ficha">
+      <div class="panel__cab"><div class="panel__titulo"><img src="img/ico-trigo.png" alt="" />
+        <div><h2>Datos del productor</h2><p>El RUT va con guion y sin puntos: 12345678-9</p></div></div></div>
+    <form class="panel__cuerpo form" (ngSubmit)="guardar()">
       <label>RUT <input [ngModel]="form().rut" (ngModelChange)="campo('rut', $event)" name="rut" required placeholder="12345678-9" maxlength="15" /></label>
       <label>Razón social <input [ngModel]="form().razonSocial" (ngModelChange)="campo('razonSocial', $event)" name="rs" required maxlength="200" /></label>
       <label>Teléfono <input [ngModel]="form().telefono" (ngModelChange)="campo('telefono', $event)" name="tel" maxlength="30" /></label>
@@ -25,12 +30,13 @@ import { FichaForm, fichaDesde, normalizarFicha } from '../../core/usuarios';
       </label>
       @if (error()) { <p class="alerta alerta--error">{{ error() }}</p> }
       @if (guardado()) { <p class="alerta">Ficha guardada.</p> }
-      <div><button class="btn btn--primario" type="submit" [disabled]="!cuenta()">Guardar</button></div>
+      <div><button class="btn btn--primario" type="submit" [disabled]="!cuenta()">Guardar ficha</button></div>
     </form>
+    </section>
   `,
   styles: `
-    .nota { color: var(--gris-600); margin-top: -.5rem; }
-    .form { display: grid; gap: .5rem; max-width: 520px; }
+    .ficha { max-width: 640px; }
+    .form { display: grid; gap: .7rem; }
   `,
 })
 export class MiPerfil implements OnInit {
