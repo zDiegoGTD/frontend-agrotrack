@@ -10,6 +10,21 @@ import { EstadoBadge } from '../../shared/estado-badge';
 import { FlujoEstados } from '../../shared/flujo-estados';
 import { Modal } from '../../shared/modal';
 
+/** El oid de Azure es un UUID: en la tabla basta el comienzo; el completo va en el title. */
+export function productorCorto(oid: string): string {
+  return oid.length > 12 ? `${oid.slice(0, 8)}…` : oid;
+}
+
+/**
+ * Peso que de verdad entro a bodega. Si al recibir no se escribio peso, el
+ * backend toma el declarado y deja pesoRecibido vacio: la fecha de recepcion
+ * es la que dice que el lote si se recibio.
+ */
+export function pesoReal(e: Pick<Entrega, 'pesoRecibido' | 'fechaRecepcion' | 'cantidad'>): number | null {
+  if (e.pesoRecibido != null) return e.pesoRecibido;
+  return e.fechaRecepcion ? e.cantidad : null;
+}
+
 /**
  * /deliveries, seccion 6: listar, crear (productor o jefe de acopio) y
  * cambiar estado (jefe de acopio / admin). Las etapas que se ofrecen salen
@@ -43,26 +58,30 @@ import { Modal } from '../../shared/modal';
       </div>
       <div class="tabla-wrap">
         <table class="tabla">
-          <thead><tr><th>Lote</th><th>Producto</th><th>Bodega</th><th class="num">Declarado</th><th class="num">Recibido</th><th>Estado</th><th>Registro</th><th></th></tr></thead>
+          <thead><tr><th>Lote</th><th>Producto · Bodega</th><th class="num">Carga (kg)</th><th>Estado</th><th>Registro</th><th></th></tr></thead>
           <tbody>
             @for (e of visibles(); track e.id) {
               <tr [class.resaltada]="e.codigo === resaltar()">
-                <td><b class="mono">{{ e.codigo }}</b><br /><small class="mono">{{ e.productorId }}</small></td>
-                <td>{{ nombreProducto(e.productoId) }}</td>
-                <td>{{ nombreBodega(e.bodegaId) }}</td>
-                <td class="num mono">{{ e.cantidad | number: '1.0-2' }}</td>
-                <td class="num carga">{{ e.pesoRecibido == null ? '–' : (e.pesoRecibido | number: '1.0-2') }}</td>
+                <td><b class="mono">{{ e.codigo }}</b><br /><small class="mono" [title]="'Productor ' + e.productorId">{{ productorCorto(e.productorId) }}</small></td>
+                <td>{{ nombreProducto(e.productoId) }}<br /><small>{{ nombreBodega(e.bodegaId) }}</small></td>
+                <td class="num">
+                  @if (pesoReal(e); as peso) {
+                    <span class="carga">{{ peso | number: '1.0-2' }}</span><br /><small>recibido · declaró {{ e.cantidad | number: '1.0-0' }}</small>
+                  } @else {
+                    <span class="carga">{{ e.cantidad | number: '1.0-2' }}</span><br /><small>declarado</small>
+                  }
+                </td>
                 <td><app-estado-badge [estado]="e.estado" />
                   @if (e.motivoRechazo) { <br /><small class="motivo">{{ e.motivoRechazo }}</small> }</td>
                 <td class="mono fecha">{{ e.fechaRegistro | date: 'dd MMM HH:mm' }}</td>
                 <td class="num">
                   @if (puedeCambiar() && !e.terminal) {
-                    <button class="btn btn--sol btn--chico" (click)="abrirCambio(e)">Avanzar estado →</button>
+                    <button class="btn btn--sol btn--chico" (click)="abrirCambio(e)">Avanzar →</button>
                   } @else { <small><i>{{ e.terminal ? 'Completado' : 'Solo lectura' }}</i></small> }
                 </td>
               </tr>
             } @empty {
-              <tr><td colspan="8"><div class="vacio"><img src="img/mascota-saluda.png" alt="" class="vacio-img" /><br />No hay lotes con estos criterios. Prueba otro filtro.</div></td></tr>
+              <tr><td colspan="6"><div class="vacio"><img src="img/mascota-saluda.png" alt="" class="vacio-img" /><br />No hay lotes con estos criterios. Prueba otro filtro.</div></td></tr>
             }
           </tbody>
         </table>
@@ -244,6 +263,8 @@ export class Deliveries implements OnInit {
 
   nombreProducto = (id: number) => this.productos().find((p) => p.id === id)?.nombre ?? `Producto #${id}`;
   nombreBodega = (id: number) => this.bodegas().find((b) => b.id === id)?.nombre ?? `Bodega #${id}`;
+  productorCorto = productorCorto;
+  pesoReal = pesoReal;
 
   abrirNueva() {
     this.errorForm.set('');
