@@ -12,7 +12,10 @@ import {
   Producto,
   TopProducto,
   Transiciones,
-  Usuario,
+  CuentaUsuario,
+  EstadoCuenta,
+  PerfilProductor,
+  Yo,
 } from '../models';
 
 /** Todas las llamadas al BFF. Una sola clase: el BFF ya es un solo host. */
@@ -22,8 +25,26 @@ export class ApiService {
   private readonly base = environment.apiUrl;
 
   // ---- identidad ----
-  me(): Promise<Usuario> {
-    return this.get<Usuario>('/api/me');
+  /** Ademas de decir quien soy, registra la cuenta la primera vez (lo hace el BFF). */
+  me(): Promise<Yo> {
+    return this.get<Yo>('/api/me');
+  }
+
+  // ---- usuarios ----
+  usuarios(estado?: EstadoCuenta): Promise<CuentaUsuario[]> {
+    return this.get<CuentaUsuario[]>('/api/users', { estado });
+  }
+
+  cambiarEstadoCuenta(id: number, body: { estado: EstadoCuenta; motivo?: string | null }): Promise<CuentaUsuario> {
+    return this.put<CuentaUsuario>(`/api/users/${id}/estado`, body);
+  }
+
+  miCuenta(): Promise<CuentaUsuario> {
+    return this.get<CuentaUsuario>('/api/users/me');
+  }
+
+  guardarFicha(id: number, ficha: PerfilProductor): Promise<PerfilProductor> {
+    return this.put<PerfilProductor>(`/api/users/${id}/perfil`, ficha);
   }
 
   // ---- entregas ----

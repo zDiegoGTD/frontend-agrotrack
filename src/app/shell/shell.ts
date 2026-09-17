@@ -3,6 +3,7 @@ import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } fro
 import { filter } from 'rxjs';
 import { environment } from '../../environments/environment';
 import { AuthService } from '../core/auth/auth.service';
+import { CuentaService } from '../core/auth/cuenta.service';
 import { ROL_ETIQUETA } from '../core/estados';
 import { Rol } from '../core/models';
 
@@ -113,6 +114,7 @@ interface Enlace {
 export class Shell {
   readonly auth = inject(AuthService);
   private readonly router = inject(Router);
+  private readonly cuenta = inject(CuentaService);
 
   readonly menuAbierto = signal(false);
   readonly modo = environment.auth.mode === 'msal' ? 'Azure AD' : 'Modo desarrollo';
@@ -123,6 +125,8 @@ export class Shell {
     { ruta: '/catalog', texto: 'Catálogo', icono: 'img/nav-catalogo.png', roles: ['ADMIN', 'OPERADOR'] },
     { ruta: '/reports', texto: 'Reportería', icono: 'img/nav-reporteria.png', roles: ['ADMIN'] },
     { ruta: '/audit', texto: 'Auditoría', icono: 'img/nav-auditoria.png', roles: ['ADMIN', 'AUDITOR'] },
+    { ruta: '/usuarios', texto: 'Usuarios', icono: 'img/nav-dashboard.png', roles: ['ADMIN'] },
+    { ruta: '/mi-perfil', texto: 'Mi ficha', icono: 'img/ico-trigo.png', roles: ['CLIENTE'] },
     { ruta: '/sesion', texto: 'Mi sesión', icono: 'img/ico-checklist.png', roles: ['ADMIN', 'OPERADOR', 'CLIENTE', 'AUDITOR'] },
   ];
 
@@ -138,6 +142,8 @@ export class Shell {
   }
 
   async salir() {
+    // Si otra persona entra en este navegador, no debe heredar el estado de esta cuenta.
+    this.cuenta.limpiar();
     await this.auth.logout();
     this.router.navigate(['/login']);
   }

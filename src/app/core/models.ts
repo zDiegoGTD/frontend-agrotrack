@@ -104,3 +104,38 @@ export interface Problema {
   /** Codigo de negocio cuando el backend lo manda, p. ej. CUENTA_PENDIENTE. */
   codigo?: string;
 }
+
+/** Estado de la cuenta en ms-agrotrack-users. Solo ACTIVO usa el sistema. */
+export type EstadoCuenta = 'PENDIENTE' | 'ACTIVO' | 'RECHAZADO' | 'INACTIVO';
+
+/** Respuesta de /api/me: identidad del token + estado de la cuenta. */
+export interface Yo extends Usuario {
+  usuarioId: number | null;
+  estado: EstadoCuenta;
+  motivo: string | null;
+  primerIngreso: string | null;
+}
+
+export interface PerfilProductor {
+  rut: string;
+  razonSocial: string;
+  telefono: string | null;
+  direccion: string | null;
+  bodegaHabitualId: number | null;
+}
+
+export interface CuentaUsuario {
+  id: number;
+  azureOid: string;
+  email: string | null;
+  nombre: string | null;
+  estado: EstadoCuenta;
+  /** Informativo: el rol con el que entro la ultima vez. */
+  rolUltimoToken: Rol | null;
+  motivo: string | null;
+  primerIngreso: string;
+  ultimoIngreso: string;
+  aprobadoPor: string | null;
+  aprobadoEn: string | null;
+  perfil: PerfilProductor | null;
+}
