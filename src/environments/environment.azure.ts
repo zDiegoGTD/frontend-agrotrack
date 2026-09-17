@@ -1,4 +1,4 @@
-﻿// Generado por infra/local/azure-local.ps1 â€” login real de Azure contra el backend local.
+// Generado por infra/local/azure-local.ps1 - login real de Azure contra el backend local.
 export const environment = {
   production: false,
   apiUrl: 'http://localhost:8081',

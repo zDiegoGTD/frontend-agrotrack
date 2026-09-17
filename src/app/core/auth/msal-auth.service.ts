@@ -2,7 +2,7 @@ import { Injectable, inject, signal } from '@angular/core';
 import { MsalService } from '@azure/msal-angular';
 import { AccountInfo, BrowserAuthError, InteractionRequiredAuthError } from '@azure/msal-browser';
 import { environment } from '../../../environments/environment';
-import { AuthService, usuarioDesdeClaims } from './auth.service';
+import { AuthService, leerClaims, usuarioDesdeClaims } from './auth.service';
 import { Usuario } from '../models';
 
 /**
@@ -92,7 +92,8 @@ export class MsalAuthService extends AuthService {
     try {
       const r = await this.msal.instance.acquireTokenSilent({ scopes: this.scopes, account: cuenta });
       const claims = (r.idTokenClaims ?? {}) as Record<string, unknown>;
-      const accessClaims = JSON.parse(atob(r.accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+      // leerClaims decodifica UTF-8: con atob a secas "Hernán" llegaba como "HernÃ¡n"
+      const accessClaims = leerClaims(r.accessToken) ?? {};
       this._user.set(usuarioDesdeClaims({ ...claims, ...accessClaims }));
     } catch {
       this._user.set({

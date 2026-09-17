@@ -30,7 +30,7 @@ import { FichaForm, fichaDesde, normalizarFicha } from '../../core/usuarios';
       </label>
       @if (error()) { <p class="alerta alerta--error">{{ error() }}</p> }
       @if (guardado()) { <p class="alerta">Ficha guardada.</p> }
-      <div><button class="btn btn--primario" type="submit" [disabled]="!cuenta()">Guardar ficha</button></div>
+      <div><button class="btn btn--primario" type="submit" [disabled]="!cuenta() || guardando()">{{ guardando() ? 'Guardando…' : 'Guardar ficha' }}</button></div>
     </form>
     </section>
   `,
@@ -47,6 +47,7 @@ export class MiPerfil implements OnInit {
   readonly form = signal<FichaForm>(fichaDesde(null));
   readonly error = signal('');
   readonly guardado = signal(false);
+  readonly guardando = signal(false);
 
   async ngOnInit() {
     try {
@@ -66,7 +67,9 @@ export class MiPerfil implements OnInit {
 
   async guardar() {
     const c = this.cuenta();
-    if (!c) return;
+    // Doble clic o conexion lenta: una sola peticion a la vez
+    if (!c || this.guardando()) return;
+    this.guardando.set(true);
     this.error.set('');
     this.guardado.set(false);
     try {
@@ -75,6 +78,8 @@ export class MiPerfil implements OnInit {
     } catch (e) {
       const p = e as Problema;
       this.error.set(p.campos ? Object.entries(p.campos).map(([k, v]) => `${k}: ${v}`).join(' · ') : p.detail);
+    } finally {
+      this.guardando.set(false);
     }
   }
 }

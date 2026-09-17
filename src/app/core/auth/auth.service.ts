@@ -37,9 +37,10 @@ export abstract class AuthService {
 /** Decodifica el payload de un JWT sin verificarlo: la verificacion la hace el BFF. */
 export function leerClaims(token: string): Record<string, unknown> | null {
   try {
-    const payload = token.split('.')[1];
-    const json = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
-    return JSON.parse(decodeURIComponent(escape(json)));
+    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+    // atob da bytes sueltos; TextDecoder los arma como UTF-8 (tildes, eñes)
+    const bytes = Uint8Array.from(atob(payload), (c) => c.charCodeAt(0));
+    return JSON.parse(new TextDecoder().decode(bytes));
   } catch {
     return null;
   }

@@ -46,7 +46,7 @@ type Filtro = EstadoCuenta | '';
                 <td class="mono fecha">{{ u.primerIngreso | date: 'dd MMM HH:mm' }}</td>
                 <td class="acciones">
                   @for (a of acciones(u); track a.texto) {
-                    <button class="btn btn--chico" [class.btn--peligro]="a.peligro" [class.btn--primario]="!a.peligro" (click)="iniciar(u, a)">{{ a.texto }}</button>
+                    <button class="btn btn--chico" [class.btn--peligro]="a.peligro" [class.btn--primario]="!a.peligro" (click)="iniciar(u, a)" [disabled]="guardando()">{{ a.texto }}</button>
                   }
                   @if (u.rolUltimoToken === 'CLIENTE' || u.perfil) {
                     <button class="btn btn--chico" (click)="abrirFicha(u)">Ficha</button>
@@ -67,7 +67,7 @@ type Filtro = EstadoCuenta | '';
         @if (errorAccion()) { <p class="alerta alerta--error">{{ errorAccion() }}</p> }
         <ng-container pie>
           <button class="btn btn--ghost" (click)="enCurso.set(null)">Cancelar</button>
-          <button class="btn btn--peligro" (click)="confirmar()">{{ ac.accion.texto }}</button>
+          <button class="btn btn--peligro" (click)="confirmar()" [disabled]="guardando()">{{ ac.accion.texto }}</button>
         </ng-container>
       </app-modal>
     }
@@ -89,7 +89,7 @@ type Filtro = EstadoCuenta | '';
         @if (errorFicha()) { <p class="alerta alerta--error">{{ errorFicha() }}</p> }
         <ng-container pie>
           <button class="btn btn--ghost" (click)="ficha.set(null)">Cancelar</button>
-          <button class="btn btn--primario" (click)="guardarFicha()">Guardar</button>
+          <button class="btn btn--primario" (click)="guardarFicha()" [disabled]="guardando()">{{ guardando() ? 'Guardando…' : 'Guardar' }}</button>
         </ng-container>
       </app-modal>
     }
@@ -130,6 +130,8 @@ export class Usuarios implements OnInit {
   readonly errorAccion = signal('');
   readonly ficha = signal<{ usuario: CuentaUsuario; form: FichaForm } | null>(null);
   readonly errorFicha = signal('');
+  /** Doble clic o conexion lenta: una sola accion a la vez. */
+  readonly guardando = signal(false);
   motivo = '';
 
   async ngOnInit() {
@@ -175,6 +177,8 @@ export class Usuarios implements OnInit {
   }
 
   async ejecutar(u: CuentaUsuario, a: AccionCuenta, motivo: string | null = null) {
+    if (this.guardando()) return;
+    this.guardando.set(true);
     try {
       await this.api.cambiarEstadoCuenta(u.id, { estado: a.destino, motivo });
       this.enCurso.set(null);
@@ -183,6 +187,8 @@ export class Usuarios implements OnInit {
       const p = e as Problema;
       if (this.enCurso()) this.errorAccion.set(p.detail);
       else this.error.set(p.detail);
+    } finally {
+      this.guardando.set(false);
     }
   }
 
@@ -193,7 +199,8 @@ export class Usuarios implements OnInit {
 
   async guardarFicha() {
     const fi = this.ficha();
-    if (!fi) return;
+    if (!fi || this.guardando()) return;
+    this.guardando.set(true);
     this.errorFicha.set('');
     try {
       await this.api.guardarFicha(fi.usuario.id, normalizarFicha(fi.form));
@@ -202,6 +209,8 @@ export class Usuarios implements OnInit {
     } catch (e) {
       const p = e as Problema;
       this.errorFicha.set(p.campos ? Object.entries(p.campos).map(([k, v]) => `${k}: ${v}`).join(' · ') : p.detail);
+    } finally {
+      this.guardando.set(false);
     }
   }
 }

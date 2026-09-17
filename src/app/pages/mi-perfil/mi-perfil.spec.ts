@@ -28,6 +28,21 @@ describe('MiPerfil', () => {
     expect(f.componentInstance.form().rut).toBe('12345678-9');
   });
 
+  it('un doble clic en Guardar envía la ficha una sola vez', async () => {
+    let terminar!: (v: unknown) => void;
+    api.guardarFicha.mockReturnValue(new Promise((r) => (terminar = r)));
+    const f = TestBed.createComponent(MiPerfil);
+    f.detectChanges();
+    await vi.waitFor(() => expect(f.componentInstance.cuenta()).not.toBeNull());
+
+    const primero = f.componentInstance.guardar();
+    const segundo = f.componentInstance.guardar();
+    terminar(cuenta.perfil);
+    await Promise.all([primero, segundo]);
+
+    expect(api.guardarFicha).toHaveBeenCalledTimes(1);
+  });
+
   it('guarda sobre SU id con la ficha normalizada y avisa', async () => {
     api.guardarFicha.mockResolvedValue(cuenta.perfil);
     const f = TestBed.createComponent(MiPerfil);

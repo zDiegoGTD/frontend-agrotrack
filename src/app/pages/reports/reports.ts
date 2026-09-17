@@ -2,6 +2,7 @@ import { DatePipe, DecimalPipe } from '@angular/common';
 import { Component, OnInit, computed, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
+import { MAX_BARRAS, puntosDelGrafico } from '../../core/grafico';
 import { EstadoEntrega, Kpis, Problema, Producto, TopProducto } from '../../core/models';
 import { EstadoBadge } from '../../shared/estado-badge';
 
@@ -34,11 +35,11 @@ import { EstadoBadge } from '../../shared/estado-badge';
       <section class="panel">
         <div class="panel__cab"><div class="panel__titulo"><img src="img/nav-reporteria.png" alt="" /><div><h2>Entregas por hora</h2><p>Registradas, recibidas y despachadas</p></div></div></div>
         <div class="panel__cuerpo">
-          @if (k.entregasPorHora.length) {
+          @if (puntos().length) {
             <svg [attr.viewBox]="'0 0 ' + ancho + ' 160'" class="grafico" preserveAspectRatio="none">
-              @for (h of k.entregasPorHora; track h.hora; let i = $index) {
+              @for (h of puntos(); track h.hora; let i = $index) {
                 <g [attr.transform]="'translate(' + (i * paso + margen) + ',0)'">
-                  <rect [attr.x]="0" [attr.y]="140 - alto(h.registradas)" [attr.width]="barra" [attr.height]="alto(h.registradas)" class="b-reg"><title>{{ h.hora | date: 'dd/MM HH:mm' }} · registradas {{ h.registradas }}</title></rect>
+                  <rect [attr.x]="0" [attr.y]="140 - alto(h.registradas)" [attr.width]="barra" [attr.height]="alto(h.registradas)" class="b-reg"><title>{{ h.hora | date: formatoPunto() }} · registradas {{ h.registradas }}</title></rect>
                   <rect [attr.x]="barra + 3" [attr.y]="140 - alto(h.recibidas)" [attr.width]="barra" [attr.height]="alto(h.recibidas)" class="b-rec"><title>recibidas {{ h.recibidas }}</title></rect>
                   <rect [attr.x]="2 * (barra + 3)" [attr.y]="140 - alto(h.despachadas)" [attr.width]="barra" [attr.height]="alto(h.despachadas)" class="b-des"><title>despachadas {{ h.despachadas }}</title></rect>
                 </g>
@@ -46,7 +47,7 @@ import { EstadoBadge } from '../../shared/estado-badge';
               <line x1="0" y1="140" [attr.x2]="ancho" y2="140" class="eje" />
             </svg>
             <div class="leyenda"><span><i class="b-reg"></i> registradas</span><span><i class="b-rec"></i> recibidas</span><span><i class="b-des"></i> despachadas</span>
-              <span class="mono rango-txt">{{ k.entregasPorHora[0].hora | date: 'dd/MM HH:mm' }} → {{ k.entregasPorHora[k.entregasPorHora.length - 1].hora | date: 'dd/MM HH:mm' }}</span></div>
+              <span class="mono rango-txt">{{ puntos()[0].hora | date: formatoPunto() }} → {{ puntos()[puntos().length - 1].hora | date: formatoPunto() }}@if (porDia()) { · por día }</span></div>
           } @else { <p class="vacio">Sin movimientos en el rango.</p> }
         </div>
       </section>
@@ -98,12 +99,16 @@ export class Reports implements OnInit {
   readonly productos = signal<Producto[]>([]);
   readonly error = signal('');
 
+  /** Hora por hora, o por dia si son demasiadas horas para verse (7 y 30 dias). */
+  readonly puntos = computed(() => puntosDelGrafico(this.kpis()?.entregasPorHora ?? []));
+  readonly porDia = computed(() => (this.kpis()?.entregasPorHora.length ?? 0) > MAX_BARRAS);
+  readonly formatoPunto = computed(() => (this.porDia() ? 'dd/MM' : 'dd/MM HH:mm'));
   readonly ancho = 720;
-  get paso() { return this.ancho / Math.max(1, this.kpis()?.entregasPorHora.length ?? 1); }
+  get paso() { return this.ancho / Math.max(1, this.puntos().length); }
   /** Con pocas horas de datos las barras serian bloques gigantes: se limitan y se centran en su hora. */
   get barra() { return Math.max(2, Math.min(28, this.paso / 3 - 3)); }
   get margen() { return (this.paso - 3 * this.barra - 6) / 2; }
-  private get maximo() { return Math.max(1, ...(this.kpis()?.entregasPorHora ?? []).flatMap((h) => [h.registradas, h.recibidas, h.despachadas])); }
+  private get maximo() { return Math.max(1, ...this.puntos().flatMap((h) => [h.registradas, h.recibidas, h.despachadas])); }
   alto = (v: number) => (v / this.maximo) * 130;
 
   readonly totales = computed(() => (this.kpis()?.entregasPorHora ?? []).reduce(

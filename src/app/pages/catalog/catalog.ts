@@ -83,7 +83,7 @@ type BodegaForm = { id: number | null; nombre: string; ubicacion: string; capaci
         @if (errorBodega()) { <p class="alerta alerta--error">{{ errorBodega() }}</p> }
         <ng-container pie>
           <button class="btn btn--ghost" (click)="formBodega.set(null)">Cancelar</button>
-          <button class="btn btn--primario" (click)="guardarBodega()">Guardar</button>
+          <button class="btn btn--primario" (click)="guardarBodega()" [disabled]="guardando()">{{ guardando() ? 'Guardando…' : 'Guardar' }}</button>
         </ng-container>
       </app-modal>
     }
@@ -100,7 +100,7 @@ type BodegaForm = { id: number | null; nombre: string; ubicacion: string; capaci
         @if (errorProducto()) { <p class="alerta alerta--error">{{ errorProducto() }}</p> }
         <ng-container pie>
           <button class="btn btn--ghost" (click)="formProducto.set(null)">Cancelar</button>
-          <button class="btn btn--primario" (click)="guardarProducto()">Guardar</button>
+          <button class="btn btn--primario" (click)="guardarProducto()" [disabled]="guardando()">{{ guardando() ? 'Guardando…' : 'Guardar' }}</button>
         </ng-container>
       </app-modal>
     }
@@ -134,6 +134,8 @@ export class Catalog implements OnInit {
   readonly formBodega = signal<BodegaForm | null>(null);
   readonly errorProducto = signal('');
   readonly errorBodega = signal('');
+  /** Doble clic o conexion lenta: evita crear el mismo producto o bodega dos veces. */
+  readonly guardando = signal(false);
 
   readonly total = computed(() => this.bodegas().reduce((s, b) => s + b.capacidadTotal, 0));
   readonly libre = computed(() => this.bodegas().reduce((s, b) => s + b.capacidadDisponible, 0));
@@ -162,6 +164,8 @@ export class Catalog implements OnInit {
 
   async guardarProducto() {
     const f = this.formProducto()!;
+    if (this.guardando()) return;
+    this.guardando.set(true);
     this.errorProducto.set('');
     try {
       const body = { codigo: f.codigo, nombre: f.nombre, unidadMedida: f.unidadMedida, tarifa: f.tarifa ?? 0, activo: f.activo };
@@ -170,11 +174,15 @@ export class Catalog implements OnInit {
       await this.cargar();
     } catch (e) {
       this.errorProducto.set(this.texto(e as Problema));
+    } finally {
+      this.guardando.set(false);
     }
   }
 
   async guardarBodega() {
     const f = this.formBodega()!;
+    if (this.guardando()) return;
+    this.guardando.set(true);
     this.errorBodega.set('');
     try {
       const body = { nombre: f.nombre, ubicacion: f.ubicacion, capacidadTotal: f.capacidadTotal ?? 0 };
@@ -183,6 +191,8 @@ export class Catalog implements OnInit {
       await this.cargar();
     } catch (e) {
       this.errorBodega.set(this.texto(e as Problema));
+    } finally {
+      this.guardando.set(false);
     }
   }
 

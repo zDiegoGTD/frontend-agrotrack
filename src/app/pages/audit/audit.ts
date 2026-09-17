@@ -4,6 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { ApiService } from '../../core/api/api.service';
 import { ESTADO_DE_EVENTO } from '../../core/estados';
 import { EventoAuditoria, Problema } from '../../core/models';
+import { finDelDiaLocal, inicioDelDiaLocal } from '../../core/fechas';
 import { EstadoBadge } from '../../shared/estado-badge';
 
 /** /audit, seccion 6: trazabilidad de la entrega. Filtros: usuario, fechas, tipo de evento. */
@@ -125,8 +126,8 @@ export class Audit implements OnInit {
     try {
       this.eventos.set(await this.api.eventos({
         usuario: this.f.usuario || undefined, tipo: this.f.tipo || undefined,
-        desde: this.f.desde ? `${this.f.desde}T00:00:00Z` : undefined,
-        hasta: this.f.hasta ? `${this.f.hasta}T23:59:59Z` : undefined, limite: '200',
+        desde: inicioDelDiaLocal(this.f.desde),
+        hasta: finDelDiaLocal(this.f.hasta), limite: '200',
       }));
       this.buscados.set(true);
     } catch (e) {

@@ -6,6 +6,7 @@ import { ApiService } from '../../core/api/api.service';
 import { AuthService } from '../../core/auth/auth.service';
 import { DESCRIPCION, ETIQUETA, contarPorEstado, puedeTransicionar } from '../../core/estados';
 import { Bodega, Entrega, EstadoEntrega, Problema, Producto } from '../../core/models';
+import { finDelDiaLocal, inicioDelDiaLocal } from '../../core/fechas';
 import { EstadoBadge } from '../../shared/estado-badge';
 import { FlujoEstados } from '../../shared/flujo-estados';
 import { Modal } from '../../shared/modal';
@@ -243,8 +244,8 @@ export class Deliveries implements OnInit {
     this.error.set('');
     try {
       this.entregas.set(await this.api.listarEntregas({
-        from: this.desde ? `${this.desde}T00:00:00Z` : undefined,
-        to: this.hasta ? `${this.hasta}T23:59:59Z` : undefined,
+        from: inicioDelDiaLocal(this.desde),
+        to: finDelDiaLocal(this.hasta),
       }));
     } catch (e) {
       this.error.set((e as Problema).detail);

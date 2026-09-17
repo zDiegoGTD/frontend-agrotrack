@@ -1,4 +1,5 @@
 import { Component, computed, inject, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { filter } from 'rxjs';
 import { environment } from '../../environments/environment';
@@ -138,7 +139,10 @@ export class Shell {
 
   constructor() {
     // En movil el menu es un cajon: se cierra solo al navegar.
-    this.router.events.pipe(filter((e) => e instanceof NavigationEnd)).subscribe(() => this.menuAbierto.set(false));
+    // takeUntilDestroyed: el shell se destruye al ir a /login o /pendiente y la suscripcion no debe quedar viva
+    this.router.events
+      .pipe(filter((e) => e instanceof NavigationEnd), takeUntilDestroyed())
+      .subscribe(() => this.menuAbierto.set(false));
   }
 
   async salir() {
