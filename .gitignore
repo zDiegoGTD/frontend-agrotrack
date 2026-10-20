@@ -42,3 +42,6 @@ __screenshots__/
 # System files
 .DS_Store
 Thumbs.db
+
+# Grafo de conocimiento local (graphify), no es parte del proyecto
+graphify-out/

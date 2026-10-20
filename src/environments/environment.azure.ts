@@ -5,7 +5,8 @@ export const environment = {
   auth: {
     mode: 'msal' as 'dev' | 'msal',
     msal: {
-      clientId: '44f417b1-ff99-4463-974a-56bb29cb66dd',
+      // App "AgroTrack Web" (SPA): solo inicia sesion. El scope y los roles son de la API.
+      clientId: '3406ecc1-064d-4ef5-ac27-ad91afa6f00c',
       tenantId: '74c11418-e5f3-4253-9755-b665d755321c',
       redirectUri: 'http://localhost:4200',
       apiScope: 'api://44f417b1-ff99-4463-974a-56bb29cb66dd/access_as_user',
