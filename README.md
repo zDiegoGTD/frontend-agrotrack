@@ -1,5 +1,7 @@
 # AgroTrack — frontend
 
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?project=zDiegoGTD_frontend-agrotrack&metric=alert_status)](https://sonarcloud.io/summary/overall?id=zDiegoGTD_frontend-agrotrack) [![Seguridad](https://sonarcloud.io/api/project_badges/measure?project=zDiegoGTD_frontend-agrotrack&metric=security_rating)](https://sonarcloud.io/summary/overall?id=zDiegoGTD_frontend-agrotrack) [![Confiabilidad](https://sonarcloud.io/api/project_badges/measure?project=zDiegoGTD_frontend-agrotrack&metric=reliability_rating)](https://sonarcloud.io/summary/overall?id=zDiegoGTD_frontend-agrotrack)
+
 Aplicación Angular de **AgroTrack**, la plataforma de acopio y despacho de
 producción agrícola del caso semestral de *Desarrollo Cloud Native I (DSY1107)*.
 
@@ -19,9 +21,10 @@ El backend (microservicios Spring Boot, infraestructura y documentación) vive e
 
 ## Identidad: Azure AD con MSAL
 
+- **Dos apps en Azure:** el login lo hace **AgroTrack Web** (este frontend, `clientId` en `environment.prod.ts`), y el token se pide para **AgroTrack API**, que define los roles y el scope.
 - **Login y logout** con `@azure/msal-angular` por redirección (`loginRedirect`).
 - **Token hacia el backend:** el `MsalInterceptor` oficial agrega el Bearer a
-  toda llamada a `…/api/*`, pidiendo el scope `api://<clientId>/access_as_user`.
+  toda llamada a `…/api/*`, pidiendo el scope `api://<id de AgroTrack API>/access_as_user`.
 - **Guardas:** `authGuard` exige sesión y `roleGuard(...)` exige rol.
   Son un espejo de la matriz del BFF: la autorización real la hace el backend.
 - **Roles desde el token:** el menú, las guardas y los botones leen el claim
@@ -82,7 +85,7 @@ npx ng build             # configuración production
 
 ## Despliegue
 
-La imagen se construye con el `Dockerfile` (build de Node y luego nginx con
-`try_files` para las rutas de Angular). En AWS la construye y levanta el stack
+La imagen se construye con el `Dockerfile`: build de Node con `npm ci --ignore-scripts` y luego
+nginx **sin root** (`nginx-unprivileged`, puerto 8080) con `try_files` para las rutas de Angular. En AWS la construye y levanta el stack
 `apps` desde el repo del backend (`infra/aws/subir.ps1`), y el API Gateway la
 sirve por HTTPS en la misma dirección que el API.
