@@ -237,7 +237,7 @@ export class Deliveries implements OnInit {
     await Promise.all([this.cargar(), this.cargarCatalogo()]);
     if (q.get('nueva') && this.puedeRegistrar()) this.abrirNueva();
     const aResaltar = this.entregas().find((e) => e.codigo === this.resaltar());
-    if (aResaltar && this.puedeCambiar() && !aResaltar.terminal) this.abrirCambio(aResaltar);
+    if (aResaltar && this.puedeCambiar() && !aResaltar.terminal) await this.abrirCambio(aResaltar);
   }
 
   async cargar() {
